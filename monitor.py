@@ -2,6 +2,7 @@
 DRESS PRODUCTION 予約ページのキャンセル枠ウォッチャー
 - 予約ページを一定間隔で開き、カレンダーに ◎○□△ の日が新しく出たら LINE に通知する
 - 予約自体は行わない（通知を見て自分で予約する）
+- LINE_USER_ID を設定しなければ、公式アカウントの友だち全員に通知する
 """
 import datetime
 import json
@@ -19,7 +20,7 @@ DURATION = int(os.environ.get("DURATION_MIN", "340")) * 60    # 1回のジョブ
 MONTHS_AHEAD = int(os.environ.get("MONTHS_AHEAD", "1"))       # 今月に加えて何か月先まで見るか
 DEBUG = os.environ.get("DEBUG") == "1"
 TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
-USER_ID = os.environ["LINE_USER_ID"]
+USER_ID = os.environ.get("LINE_USER_ID", "")  # 空なら友だち全員に送信（broadcast）
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
 DEBUG_DIR = pathlib.Path("debug")
@@ -61,9 +62,15 @@ def now():
 
 
 def line_push(text):
+    body = {"messages": [{"type": "text", "text": text[:4900]}]}
+    if USER_ID:
+        endpoint = "https://api.line.me/v2/bot/message/push"
+        body["to"] = USER_ID
+    else:
+        endpoint = "https://api.line.me/v2/bot/message/broadcast"
     req = urllib.request.Request(
-        "https://api.line.me/v2/bot/message/push",
-        data=json.dumps({"to": USER_ID, "messages": [{"type": "text", "text": text[:4900]}]}).encode(),
+        endpoint,
+        data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN}"},
     )
     try:
